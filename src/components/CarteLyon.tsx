@@ -1,5 +1,5 @@
-import { FC, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, useMapEvents } from 'react-leaflet';
+import { FC, useState, useEffect } from 'react';
+import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents } from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
@@ -34,14 +34,62 @@ const ClickHandler = ({
   return null;
 };
 
+type Node = {
+  id: number;
+  lat: number;
+  lon: number;
+};
+
 const CarteLyon: FC = () => {
   const [start, setStart] = useState<LatLng | null>(null);
   const [end, setEnd] = useState<LatLng | null>(null);
   const [placing, setPlacing] = useState<'start' | 'end' | null>(null);
+  const [nodes, setNodes] = useState<Node[]>([]);
+  const [route, setRoute] = useState<LatLng[]>([]);
 
-  if (start && end) {
-    console.log('Départ:', start, 'Arrivée:', end);
-  }
+  useEffect(() => {
+    fetch('http://37.59.111.172:8080/nodes')
+      .then(res => res.json())
+      .then(data => setNodes(data));
+  }, []);
+
+  useEffect(() => {
+    const findNearestNodeId = (point: LatLng) => {
+      let minDist = Infinity;
+      let nearestId = null;
+      for (const node of nodes) {
+        const dist = Math.hypot(node.lat - point[0], node.lon - point[1]);
+        if (dist < minDist) {
+          minDist = dist;
+          nearestId = node.id;
+        }
+      }
+      return nearestId;
+    };
+
+    if (start && end && nodes.length > 0) {
+      const startId = findNearestNodeId(start);
+      const endId = findNearestNodeId(end);
+
+      if (startId && endId) {
+        fetch(`http://37.59.111.172:8080/shortest-path?start=${startId}&end=${endId}`)
+          .then(res => res.json())
+          .then(async data => {
+            if (data.path) {
+              const coords: LatLng[] = data.path.map((id: number) => {
+                const node = nodes.find(n => n.id === id);
+                return node ? [node.lat, node.lon] : null;
+              }).filter(Boolean) as LatLng[];
+              setRoute(coords);
+            } else {
+              setRoute([]);
+            }
+          });
+      }
+    } else {
+      setRoute([]);
+    }
+  }, [start, end, nodes]);
 
   return (
     <div
@@ -81,6 +129,9 @@ const CarteLyon: FC = () => {
           <Marker position={end}>
             <Popup>Arrivée<br />{end[0].toFixed(5)}, {end[1].toFixed(5)}</Popup>
           </Marker>
+        )}
+        {route.length > 1 && (
+          <Polyline positions={route} color="red" weight={6} />
         )}
       </MapContainer>
       <div
