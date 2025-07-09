@@ -41,11 +41,14 @@ const CarteLyon: FC = () => {
   const [placing, setPlacing] = useState<'start' | 'end' | null>(null);
   const [nodes, setNodes] = useState<Node[]>([]);
   const [route, setRoute] = useState<LatLng[]>([]);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
+    setLoading(true);
     fetch(`${process.env.REACT_APP_API_URL}/nodes`)
       .then(res => res.json())
-      .then(data => setNodes(data));
+      .then(data => setNodes(data))
+      .finally(() => setLoading(false));
   }, []);
 
   useEffect(() => {
@@ -63,6 +66,7 @@ const CarteLyon: FC = () => {
     };
 
     if (start && end && nodes.length > 0) {
+      setLoading(true);
       const startId = findNearestNodeId(start);
       const endId = findNearestNodeId(end);
 
@@ -79,7 +83,10 @@ const CarteLyon: FC = () => {
             } else {
               setRoute([]);
             }
-          });
+          })
+          .finally(() => setLoading(false));
+      } else {
+        setLoading(false);
       }
     } else {
       setRoute([]);
@@ -146,6 +153,7 @@ const CarteLyon: FC = () => {
       >
         <button
           onClick={() => setPlacing('start')}
+          disabled={loading}
           style={{
             padding: '10px 24px',
             borderRadius: '8px',
@@ -153,14 +161,16 @@ const CarteLyon: FC = () => {
             background: placing === 'start' ? '#1976d2' : '#90caf9',
             color: '#fff',
             fontWeight: 'bold',
-            cursor: 'pointer',
+            cursor: loading ? 'not-allowed' : 'pointer',
             fontSize: '1rem',
+            opacity: loading ? 0.7 : 1,
           }}
         >
-          Placer départ
+          {loading && placing === 'start' ? 'Chargement...' : 'Placer départ'}
         </button>
         <button
           onClick={() => setPlacing('end')}
+          disabled={loading}
           style={{
             padding: '10px 24px',
             borderRadius: '8px',
@@ -168,13 +178,35 @@ const CarteLyon: FC = () => {
             background: placing === 'end' ? '#388e3c' : '#a5d6a7',
             color: '#fff',
             fontWeight: 'bold',
-            cursor: 'pointer',
+            cursor: loading ? 'not-allowed' : 'pointer',
             fontSize: '1rem',
+            opacity: loading ? 0.7 : 1,
           }}
         >
-          Placer arrivée
+          {loading && placing === 'end' ? 'Chargement...' : 'Placer arrivée'}
         </button>
       </div>
+      {loading && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            width: '100vw',
+            height: '100vh',
+            background: 'rgba(255,255,255,0.4)',
+            zIndex: 2000,
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '2rem',
+            color: '#1976d2',
+            pointerEvents: 'none',
+          }}
+        >
+          Chargement...
+        </div>
+      )}
     </div>
   );
 };
