@@ -48,7 +48,7 @@ const CarteLyon: FC = () => {
   const [route, setRoute] = useState<LatLng[]>([]);
 
   useEffect(() => {
-    fetch('http://37.59.111.172:8080/nodes')
+    fetch(`${process.env.REACT_APP_API_URL}/nodes`)
       .then(res => res.json())
       .then(data => setNodes(data));
   }, []);
@@ -72,7 +72,7 @@ const CarteLyon: FC = () => {
       const endId = findNearestNodeId(end);
 
       if (startId && endId) {
-        fetch(`http://37.59.111.172:8080/shortest-path?start=${startId}&end=${endId}`)
+        fetch(`${process.env.REACT_APP_API_URL}/shortest-path?start=${startId}&end=${endId}`)
           .then(res => res.json())
           .then(async data => {
             if (data.path) {
