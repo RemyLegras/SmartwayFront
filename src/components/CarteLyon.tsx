@@ -16,6 +16,7 @@ L.Icon.Default.mergeOptions({
 const lyon: [number, number] = [45.75, 4.85];
 
 type LatLng = [number, number];
+type Node = { id: number; lat: number; lon: number };
 
 const ClickHandler = ({
   placing,
@@ -38,25 +39,52 @@ const CarteLyon: FC = () => {
   const [start, setStart] = useState<LatLng | null>(null);
   const [end, setEnd] = useState<LatLng | null>(null);
   const [placing, setPlacing] = useState<'start' | 'end' | null>(null);
+  const [nodes, setNodes] = useState<Node[]>([]);
   const [route, setRoute] = useState<LatLng[]>([]);
 
   useEffect(() => {
-    if (start && end) {
-      fetch(
-        `${process.env.REACT_APP_API_URL}/shortest-path?startLat=${start[0]}&startLon=${start[1]}&endLat=${end[0]}&endLon=${end[1]}`
-      )
-        .then(res => res.json())
-        .then(data => {
-          if (data.path) {
-            setRoute(data.path);
-          } else {
-            setRoute([]);
-          }
-        });
+    fetch(`${process.env.REACT_APP_API_URL}/nodes`)
+      .then(res => res.json())
+      .then(data => setNodes(data));
+  }, []);
+
+  useEffect(() => {
+    const findNearestNodeId = (point: LatLng) => {
+      let minDist = Infinity;
+      let nearestId = null;
+      for (const node of nodes) {
+        const dist = Math.hypot(node.lat - point[0], node.lon - point[1]);
+        if (dist < minDist) {
+          minDist = dist;
+          nearestId = node.id;
+        }
+      }
+      return nearestId;
+    };
+
+    if (start && end && nodes.length > 0) {
+      const startId = findNearestNodeId(start);
+      const endId = findNearestNodeId(end);
+
+      if (startId && endId) {
+        fetch(`${process.env.REACT_APP_API_URL}/shortest-path?start=${startId}&end=${endId}`)
+          .then(res => res.json())
+          .then(data => {
+            if (data.path) {
+              const coords: LatLng[] = data.path.map((id: number) => {
+                const node = nodes.find(n => n.id === id);
+                return node ? [node.lat, node.lon] : null;
+              }).filter(Boolean) as LatLng[];
+              setRoute(coords);
+            } else {
+              setRoute([]);
+            }
+          });
+      }
     } else {
       setRoute([]);
     }
-  }, [start, end]);
+  }, [start, end, nodes]);
 
   return (
     <div
