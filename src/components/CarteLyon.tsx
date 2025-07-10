@@ -1,7 +1,16 @@
 import { FC, useState, useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Popup, Polyline, useMapEvents } from 'react-leaflet';
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Polyline,
+  useMapEvents,
+  ZoomControl
+} from 'react-leaflet';
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
+import styles from './CarteLyon.module.css';
 
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
@@ -12,6 +21,29 @@ L.Icon.Default.mergeOptions({
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
 });
+
+function createSvgPin(color: string) {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 41">
+      <path
+        d="M12.5,0 C7,0 2.5,4.5 2.5,10 c0,8.75 10,20.5 10,20.5 s10,-11.75 10,-20.5 C22.5,4.5 18,0 12.5,0 z"
+        fill="${color}"
+      />
+      <circle cx="12.5" cy="10" r="5" fill="#FFFFFF"/>
+    </svg>
+  `.trim();
+
+  return L.divIcon({
+    html: svg,
+    className: '',
+    iconSize:     [25, 41],
+    iconAnchor:   [12, 41],
+    popupAnchor:  [1, -34],
+  });
+}
+
+const startIcon = createSvgPin('var(--color-blue-dark)');
+const endIcon   = createSvgPin('var(--color-green-dark)');
 
 const lyon: [number, number] = [45.75, 4.85];
 
@@ -37,10 +69,10 @@ const ClickHandler = ({
 
 const CarteLyon: FC = () => {
   const [start, setStart] = useState<LatLng | null>(null);
-  const [end, setEnd] = useState<LatLng | null>(null);
-  const [placing, setPlacing] = useState<'start' | 'end' | null>(null);
-  const [nodes, setNodes] = useState<Node[]>([]);
-  const [route, setRoute] = useState<LatLng[]>([]);
+  const [end, setEnd]     = useState<LatLng | null>(null);
+  const [placing, setPlacing] = useState<'start'|'end'|null>(null);
+  const [nodes, setNodes]     = useState<Node[]>([]);
+  const [route, setRoute]     = useState<LatLng[]>([]);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -54,11 +86,11 @@ const CarteLyon: FC = () => {
   useEffect(() => {
     const findNearestNodeId = (point: LatLng) => {
       let minDist = Infinity;
-      let nearestId = null;
+      let nearestId: number | null = null;
       for (const node of nodes) {
-        const dist = Math.hypot(node.lat - point[0], node.lon - point[1]);
-        if (dist < minDist) {
-          minDist = dist;
+        const d = Math.hypot(node.lat - point[0], node.lon - point[1]);
+        if (d < minDist) {
+          minDist = d;
           nearestId = node.id;
         }
       }
@@ -67,18 +99,20 @@ const CarteLyon: FC = () => {
 
     if (start && end && nodes.length > 0) {
       setLoading(true);
-      const startId = findNearestNodeId(start);
-      const endId = findNearestNodeId(end);
+      const sId = findNearestNodeId(start);
+      const eId = findNearestNodeId(end);
 
-      if (startId && endId) {
-        fetch(`${process.env.REACT_APP_API_URL}/shortest-path?start=${startId}&end=${endId}`)
+      if (sId != null && eId != null) {
+        fetch(`${process.env.REACT_APP_API_URL}/shortest-path?start=${sId}&end=${eId}`)
           .then(res => res.json())
           .then(data => {
             if (data.path) {
-              const coords: LatLng[] = data.path.map((id: number) => {
-                const node = nodes.find(n => n.id === id);
-                return node ? [node.lat, node.lon] : null;
-              }).filter(Boolean) as LatLng[];
+              const coords = data.path
+                .map((id: number) => {
+                  const n = nodes.find(x => x.id === id);
+                  return n ? [n.lat, n.lon] as LatLng : null;
+                })
+                .filter(Boolean) as LatLng[];
               setRoute(coords);
             } else {
               setRoute([]);
@@ -94,119 +128,74 @@ const CarteLyon: FC = () => {
   }, [start, end, nodes]);
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        inset: 0,
-        width: '100vw',
-        height: '100vh',
-        zIndex: 0,
-      }}
-    >
-      <MapContainer center={lyon} zoom={13} style={{ width: '100%', height: '100%' }}>
+    <div className={styles.container}>
+      <MapContainer
+        center={lyon}
+        zoom={13}
+        className={styles.map}
+        zoomControl={false} 
+      >
         <TileLayer
-          attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+          attribution='&copy; <a href="https://www.openstreetmap.org/">OSM</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
         <ClickHandler
           placing={placing === 'start'}
-          setPoint={(latlng) => {
-            setStart(latlng);
-            setPlacing(null);
-          }}
+          setPoint={latlng => { setStart(latlng); setPlacing(null); }}
         />
         <ClickHandler
           placing={placing === 'end'}
-          setPoint={(latlng) => {
-            setEnd(latlng);
-            setPlacing(null);
-          }}
+          setPoint={latlng => { setEnd(latlng); setPlacing(null); }}
         />
         {start && (
-          <Marker position={start}>
-            <Popup>Départ<br />{start[0].toFixed(5)}, {start[1].toFixed(5)}</Popup>
+          <Marker position={start} icon={startIcon}>
+            <Popup>
+              Départ<br />
+              {start.map(v => v.toFixed(5)).join(', ')}
+            </Popup>
           </Marker>
         )}
         {end && (
-          <Marker position={end}>
-            <Popup>Arrivée<br />{end[0].toFixed(5)}, {end[1].toFixed(5)}</Popup>
+          <Marker position={end} icon={endIcon}>
+            <Popup>
+              Arrivée<br />
+              {end.map(v => v.toFixed(5)).join(', ')}
+            </Popup>
           </Marker>
         )}
         {route.length > 1 && (
-          <Polyline positions={route} color="red" weight={6} />
+          <Polyline positions={route} color="#F87171" weight={6} />
+        )}
+        <ZoomControl position="topright" />
+        <div className={styles.controls}>
+          <button
+            className={`${styles.button} ${
+              placing === 'start' ? styles.startActive : styles.start
+            }`}
+            onClick={() => setPlacing('start')}
+            disabled={loading}
+          >
+            {loading && placing === 'start' ? 'Chargement...' : 'Placer départ'}
+          </button>
+          <button
+            className={`${styles.button} ${
+              placing === 'end' ? styles.endActive : styles.end
+            }`}
+            onClick={() => setPlacing('end')}
+            disabled={loading}
+          >
+            {loading && placing === 'end' ? 'Chargement...' : 'Placer arrivée'}
+          </button>
+        </div>
+        {loading && (
+          <div className={styles.loadingOverlay}>
+            <div className={styles.loadingBox}>
+              <div className={styles.spinner}></div>
+              <div className={styles.loadingText}>Chargement…</div>
+            </div>
+          </div>
         )}
       </MapContainer>
-      <div
-        style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          width: '100%',
-          background: 'rgba(255,255,255,0.95)',
-          padding: '16px',
-          display: 'flex',
-          justifyContent: 'center',
-          gap: '16px',
-          boxShadow: '0 -2px 16px rgba(0,0,0,0.08)',
-          zIndex: 1000,
-        }}
-      >
-        <button
-          onClick={() => setPlacing('start')}
-          disabled={loading}
-          style={{
-            padding: '10px 24px',
-            borderRadius: '8px',
-            border: 'none',
-            background: placing === 'start' ? '#1976d2' : '#90caf9',
-            color: '#fff',
-            fontWeight: 'bold',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            fontSize: '1rem',
-            opacity: loading ? 0.7 : 1,
-          }}
-        >
-          {loading && placing === 'start' ? 'Chargement...' : 'Placer départ'}
-        </button>
-        <button
-          onClick={() => setPlacing('end')}
-          disabled={loading}
-          style={{
-            padding: '10px 24px',
-            borderRadius: '8px',
-            border: 'none',
-            background: placing === 'end' ? '#388e3c' : '#a5d6a7',
-            color: '#fff',
-            fontWeight: 'bold',
-            cursor: loading ? 'not-allowed' : 'pointer',
-            fontSize: '1rem',
-            opacity: loading ? 0.7 : 1,
-          }}
-        >
-          {loading && placing === 'end' ? 'Chargement...' : 'Placer arrivée'}
-        </button>
-      </div>
-      {loading && (
-        <div
-          style={{
-            position: 'fixed',
-            top: 0,
-            left: 0,
-            width: '100vw',
-            height: '100vh',
-            background: 'rgba(255,255,255,0.4)',
-            zIndex: 2000,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '2rem',
-            color: '#1976d2',
-            pointerEvents: 'none',
-          }}
-        >
-          Chargement...
-        </div>
-      )}
     </div>
   );
 };
