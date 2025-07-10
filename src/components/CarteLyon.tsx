@@ -16,14 +16,12 @@ import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png';
 import markerIcon from 'leaflet/dist/images/marker-icon.png';
 import markerShadow from 'leaflet/dist/images/marker-shadow.png';
 
-// 1) On réinitialise les URLs de l’icône par défaut
 L.Icon.Default.mergeOptions({
   iconRetinaUrl: markerIcon2x,
   iconUrl: markerIcon,
   shadowUrl: markerShadow,
 });
 
-// 2) Fonction utilitaire pour créer un pin SVG coloré
 function createSvgPin(color: string) {
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 25 41">
@@ -44,7 +42,6 @@ function createSvgPin(color: string) {
   });
 }
 
-// 3) Création des icônes en utilisant tes variables CSS
 const startIcon = createSvgPin('var(--color-blue-dark)');
 const endIcon   = createSvgPin('var(--color-green-dark)');
 
@@ -78,7 +75,6 @@ const CarteLyon: FC = () => {
   const [route, setRoute]     = useState<LatLng[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // Chargement des nodes au montage
   useEffect(() => {
     setLoading(true);
     fetch(`${process.env.REACT_APP_API_URL}/nodes`)
@@ -87,7 +83,6 @@ const CarteLyon: FC = () => {
       .finally(() => setLoading(false));
   }, []);
 
-  // Calcul du plus court chemin quand start & end changent
   useEffect(() => {
     const findNearestNodeId = (point: LatLng) => {
       let minDist = Infinity;
@@ -138,13 +133,12 @@ const CarteLyon: FC = () => {
         center={lyon}
         zoom={13}
         className={styles.map}
-        zoomControl={false}  // on désactive l’icône de zoom par défaut
+        zoomControl={false} 
       >
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/">OSM</a>'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
         />
-
         <ClickHandler
           placing={placing === 'start'}
           setPoint={latlng => { setStart(latlng); setPlacing(null); }}
@@ -153,7 +147,6 @@ const CarteLyon: FC = () => {
           placing={placing === 'end'}
           setPoint={latlng => { setEnd(latlng); setPlacing(null); }}
         />
-
         {start && (
           <Marker position={start} icon={startIcon}>
             <Popup>
@@ -170,13 +163,10 @@ const CarteLyon: FC = () => {
             </Popup>
           </Marker>
         )}
-
         {route.length > 1 && (
-          <Polyline positions={route} color="#A3D9FF" weight={6} />
+          <Polyline positions={route} color="#F87171" weight={6} />
         )}
-
         <ZoomControl position="topright" />
-
         <div className={styles.controls}>
           <button
             className={`${styles.button} ${
@@ -185,7 +175,7 @@ const CarteLyon: FC = () => {
             onClick={() => setPlacing('start')}
             disabled={loading}
           >
-            {loading && placing === 'start' ? '⏳' : 'Placer départ'}
+            {loading && placing === 'start' ? 'Chargement...' : 'Placer départ'}
           </button>
           <button
             className={`${styles.button} ${
@@ -194,12 +184,16 @@ const CarteLyon: FC = () => {
             onClick={() => setPlacing('end')}
             disabled={loading}
           >
-            {loading && placing === 'end' ? '⏳' : 'Placer arrivée'}
+            {loading && placing === 'end' ? 'Chargement...' : 'Placer arrivée'}
           </button>
         </div>
-
         {loading && (
-          <div className={styles.loadingOverlay}>Chargement...</div>
+          <div className={styles.loadingOverlay}>
+            <div className={styles.loadingBox}>
+              <div className={styles.spinner}></div>
+              <div className={styles.loadingText}>Chargement…</div>
+            </div>
+          </div>
         )}
       </MapContainer>
     </div>
